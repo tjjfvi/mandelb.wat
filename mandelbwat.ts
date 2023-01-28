@@ -1,8 +1,8 @@
 /// <reference lib="dom"/>
-const memory = new WebAssembly.Memory({ initial: 256 });
+const memory = new WebAssembly.Memory({ initial: 512 });
 const width = new WebAssembly.Global({ value: "i32", mutable: true });
 const height = new WebAssembly.Global({ value: "i32", mutable: true });
-const { instance: wasm } = await WebAssembly.instantiateStreaming(
+const { instance: wasm }: any = await WebAssembly.instantiateStreaming(
   fetch("./mandelb.wasm"),
   {
     canvas: {
@@ -31,11 +31,17 @@ let imageData = new ImageData(
   height.value,
 );
 
-console.time("x");
-// @ts-ignore
-wasm.exports.draw();
-console.timeEnd("x");
+console.time("tick");
+animate();
+
+function animate() {
+  console.log(wasm.exports.scale);
+  console.timeEnd("tick");
+  console.time("tick");
+  wasm.exports.draw();
+  ctx.putImageData(imageData, 0, 0);
+  // wasm.exports.scale.value /= 1.05;
+  requestAnimationFrame(animate);
+}
 
 console.log(new Uint8Array(memory.buffer));
-
-ctx.putImageData(imageData, 0, 0);
