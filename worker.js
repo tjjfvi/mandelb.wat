@@ -2,38 +2,62 @@
 // deno-lint-ignore-file
 // This code was bundled using `deno bundle` and it's not recommended to edit it manually
 
-Date.now();
-const memory = new WebAssembly.Memory({
-    initial: 512,
-    maximum: 512,
-    shared: true
-});
-const wasmImports = {
-    env: {
-        memory
-    },
-    log: {
-        u32: console.log,
-        f64: console.log
-    }
-};
-let wasm;
-const initPromise = WebAssembly.instantiateStreaming(fetch("./mandelb.wasm"), wasmImports).then(({ instance  })=>{
-    wasm = instance.exports;
-    this;
-});
+function deferred() {
+    let methods;
+    let state = "pending";
+    const promise = new Promise((resolve, reject)=>{
+        methods = {
+            async resolve (value) {
+                await value;
+                state = "fulfilled";
+                resolve(value);
+            },
+            reject (reason) {
+                state = "rejected";
+                reject(reason);
+            }
+        };
+    });
+    Object.defineProperty(promise, "state", {
+        get: ()=>state
+    });
+    return Object.assign(promise, methods);
+}
+const ctxPromise = deferred();
+const wasmPromise = init();
+async function init() {
+    const ctx = await ctxPromise;
+    const wasmImports = {
+        ctx: {
+            memory: ctx.memory,
+            id: new WebAssembly.Global({
+                value: "i32"
+            }, ctx.id),
+            count: new WebAssembly.Global({
+                value: "i32"
+            }, ctx.count)
+        },
+        log: {
+            u32: console.log,
+            f64: console.log
+        }
+    };
+    const { instance  } = await WebAssembly.instantiateStreaming(fetch("./mandelb.wasm"), wasmImports);
+    return instance.exports;
+}
 self.addEventListener("message", async (event)=>{
-    await initPromise;
     const msg = event.data;
-    if (msg.type === "size") {
-        wasm.width.value = msg.width;
-        wasm.height.value = msg.height;
+    if (msg.type === "init") {
+        ctxPromise.resolve(msg.ctx);
+        return;
     }
+    const wasm = await wasmPromise;
     if (msg.type === "render") {
-        wasm.draw();
+        const { width , height , center_x , center_y , scale  } = msg.params;
+        wasm.draw(width, height, center_x, center_y, scale);
         send({
             type: "render",
-            buffer: memory.buffer
+            buffer: wasm.memory.buffer
         });
     }
 });

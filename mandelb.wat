@@ -1,57 +1,63 @@
 (module
-  (import "env" "memory" (memory 512 512 shared))
+  (import "ctx" "memory" (memory 512 512 shared))
+  (import "ctx" "id" (global $id i32))
+  (import "ctx" "count" (global $count i32))
 
   (import "log" "u32" (func $log_u32 (param i32)))
   (import "log" "f64" (func $log_f64 (param f64)))
   (func $dbg_u32 (param $v i32) (result i32) local.get $v call $log_u32 local.get $v)
   (func $dbg_f64 (param $v f64) (result f64) local.get $v call $log_f64 local.get $v)
 
-  (global $width (mut i32) (i32.const 0))
-  (global $height (mut i32) (i32.const 0))
-  (export "width" (global $width))
-  (export "height" (global $height))
-
-  (global $center_x (mut f64) (f64.const 0))
-  (global $center_y (mut f64) (f64.const 0))
-  (global $scale (mut f64) (f64.const 0.003125))
-  (export "center_x" (global $center_x))
-  (export "center_y" (global $center_y))
-  (export "scale" (global $scale))
-  ;; (global $scale (mut f64) (f64.const 0.00015933191591218493))
+  (export "memory" (memory 0))
 
   (global $escape2 (mut f64) (f64.const 16))
-  (global $max_iters (mut i32) (i32.const 128))
+  (global $max_iters (mut i32) (i32.const 1024))
   (export "escape2" (global $escape2))
   (export "max_iters" (global $max_iters))
   
-  (global $epsilon (mut f64) (f64.const 1e-6))
+  (global $epsilon (mut f64) (f64.const 1e-12))
   (export "epsilon" (global $epsilon))
 
   
   (func (export "draw")
+    (param $width i32)    
+    (param $height i32)    
+    (param $center_x f64)    
+    (param $center_y f64)    
+    (param $scale f64)    
+
+    (local $i i32)
     (local $x f64) (local $y f64)
-    (local $i i32) (local $j i32)
-    (local $xi f64)
-    (local $row_size i32) (local $grid_size i32)
+    (local $j i32)
+    (local $chunk_len i32) (local $row_len i32) (local $grid_len i32)
+    (local $chunk_width f64)
+    (local $row_width f64)
 
-    (local.set $xi (f64.sub (global.get $center_x) (f64.mul (f64.mul (f64.convert_i32_u (global.get $width)) (global.get $scale)) (f64.const 0.5))))
-    (local.set $y (f64.sub (global.get $center_y) (f64.mul (f64.mul (f64.convert_i32_u (global.get $height)) (global.get $scale)) (f64.const 0.5))))
+    (local.set $i (i32.mul (global.get $id) (i32.const 4)))
+    (local.set $chunk_len (i32.mul (global.get $count) (i32.const 4)))
 
-    (local.tee $row_size (i32.mul (global.get $width) (i32.const 4)))
-    (local.set $grid_size (i32.mul (global.get $height)))
+    (local.set $x (f64.sub (local.get $center_x) (f64.mul (f64.mul (f64.convert_i32_u (local.get $width)) (local.get $scale)) (f64.const 0.5))))
+    (local.set $y (f64.sub (local.get $center_y) (f64.mul (f64.mul (f64.convert_i32_u (local.get $height)) (local.get $scale)) (f64.const 0.5))))
 
+    (local.tee $row_len (i32.mul (local.get $width) (i32.const 4)))
+    (local.set $grid_len (i32.mul (local.get $height)))
+
+    (local.set $chunk_width (f64.mul (local.get $scale) (f64.convert_i32_u (global.get $count))))
+    (local.set $row_width (f64.mul (local.get $scale) (f64.convert_i32_u (local.get $width))))
+
+    (local.set $x (f64.add (local.get $x) (f64.mul (local.get $scale) (f64.convert_i32_u (global.get $id)))))
     (loop $y
-      (local.set $x (local.get $xi))
-      (local.tee $j (i32.add (local.get $j) (local.get $row_size)))
+      (local.tee $j (i32.add (local.get $j) (local.get $row_len)))
       (loop $x
         (call $draw_pixel (local.get $x) (local.get $y) (local.get $i))
 
-        (local.set $x (f64.add (local.get $x) (global.get $scale)))
-        (local.tee $i (i32.add (local.get $i) (i32.const 4)))
+        (local.set $x (f64.add (local.get $x) (local.get $chunk_width)))
+        (local.tee $i (i32.add (local.get $i) (local.get $chunk_len)))
         (br_if $x (i32.lt_u (local.get $j)))
       )
-      (local.set $y (f64.add (local.get $y) (global.get $scale)))
-      (br_if $y (i32.lt_u (local.get $grid_size)))
+      (local.set $x (f64.sub (local.get $x) (local.get $row_width)))
+      (local.set $y (f64.add (local.get $y) (local.get $scale)))
+      (br_if $y (i32.lt_u (local.get $grid_len)))
     )
   )
 
@@ -75,14 +81,14 @@
     ))
   )
   
-  (func $point (param $x f64) (param $y f64) (result f64)
-    (local $x0 f64) (local $y0 f64)
+  (func $point (param $x0 f64) (param $y0 f64) (result f64)
+    (local $x f64) (local $y f64)
     (local $x2 f64) (local $y2 f64)
     (local $xl f64) (local $yl f64)
     (local $i i32) (local $o f64)
 
-    (local.set $x0 (f64.const -0.5))
-    (local.set $y0 (f64.const -0.6))
+    ;; (local.set $x0 (f64.const -0.5))
+    ;; (local.set $y0 (f64.const -0.6))
 
     (local.set $o (f64.const 1))
     (local.set $xl (local.get $x))
@@ -97,7 +103,7 @@
       (local.tee $y2 (f64.mul (local.get $y) (local.get $y)))
       (if (f64.ge (f64.add) (global.get $escape2))
         (then
-          (local.set $o (f64.mul (local.get $o) (f64.div (call $log2 (f64.add (local.get $x2) (local.get $y2))) (f64.const 8)) (f64.sqrt) (f64.sqrt) (f64.sqrt)))
+          (local.set $o (f64.mul (local.get $o) (f64.div (call $log2 (f64.add (local.get $x2) (local.get $y2))) (f64.const 8)) (f64.sqrt) (f64.sqrt) (f64.sqrt) (f64.sqrt)))
           ;; (local.set $o (f64.const 1))
           ;; (local.set $o (f64.sub (f64.const 1) (f64.div (f64.add (local.get $o) (f64.convert_i32_u (local.get $i))) (f64.convert_i32_u (global.get $max_iters)))))
         )
@@ -115,7 +121,7 @@
             (local.set $yl (local.get $y))
           ))
           (local.tee $i (i32.add (local.get $i) (i32.const 1)))
-          (local.set $o (f64.mul (local.get $o) (f64.const 0.9170040432046712)))
+          (local.set $o (f64.mul (local.get $o) (f64.const 0.9170040432046712) (f64.sqrt)))
           (br_if $cont (i32.lt_u (global.get $max_iters)))
           (local.set $o (f64.const -1))
         )

@@ -1,83 +1,44 @@
 /// <reference lib="dom"/>
 
-import { HostMessage, WorkerMessage } from "./shared.ts";
-
-const start = Date.now();
-
-class RenderWorker {
-  worker;
-  nextDraw = -1;
-  lastStart = Date.now();
-  nextId;
-  running = false;
-
-  constructor(readonly id: number, readonly group: RenderWorker[]) {
-    this.worker = new Worker("./worker.js");
-    this.send({ type: "size", width: canvas.width, height: canvas.height });
-    this.nextId = (this.id + 1) % this.group.length;
-
-    this.worker.addEventListener("message", (event) => {
-      const msg = event.data as WorkerMessage;
-      render(msg.buffer);
-      const time = Date.now() - this.lastStart;
-      console.log(
-        Date.now() - start,
-        "worker",
-        this.id,
-        "done",
-        time,
-        this.nextDraw - Date.now(),
-      );
-      const next = this.group[this.nextId];
-      next.nextDraw = Date.now() + time / this.group.length;
-      if (!next.running) {
-        next.running = true;
-        next.start();
-      }
-      this.start();
-    });
-  }
-
-  start() {
-    if (Date.now() >= this.nextDraw) {
-      this.render();
-    } else {
-      setTimeout(() => {
-        this.render();
-      }, this.nextDraw - Date.now());
-    }
-  }
-
-  render() {
-    console.log(Date.now() - start, "worker", this.id, "start");
-    this.lastStart = Date.now();
-    this.send({ type: "render" });
-  }
-
-  send(msg: HostMessage) {
-    this.worker.postMessage(msg);
-  }
-}
+import { HostMessage, RenderParams, WorkerMessage } from "./shared.ts";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
-const workers = Array(3);
+const memory = new WebAssembly.Memory({
+  initial: 512,
+  maximum: 512,
+  shared: true,
+});
 
-for (let i = 0; i < workers.length; i++) {
-  workers[i] = new RenderWorker(i, workers);
-}
+const workerCount = 16;
+const workers = Array.from({ length: workerCount }, (_, id) => {
+  const worker = new Worker("./worker.js");
+  send(worker, { type: "init", ctx: { memory, id, count: workerCount } });
+  return worker;
+});
 
-workers[0].running = true;
-workers[0].start();
+const renderParams: RenderParams = {
+  width: canvas.width,
+  height: canvas.height,
+  center_x: -0.101096363845,
+  center_y: 0.95628651,
+  scale: .003125,
+};
 
-console.time("tick");
+let lastTick = Date.now();
 
-function render(buffer: SharedArrayBuffer) {
-  console.timeEnd("tick");
+tick();
+
+async function tick() {
+  console.time("tick");
+  renderParams.scale /= 1.05 ** ((Date.now() - lastTick) / 100);
+  lastTick = Date.now();
+  await Promise.all(workers.map(render));
+  // await render(workers[]);
   const imageData = new ImageData(
     new Uint8ClampedArray(
-      buffer,
+      memory.buffer,
       0,
       canvas.width * canvas.height * 4,
     ).slice(),
@@ -85,5 +46,23 @@ function render(buffer: SharedArrayBuffer) {
     canvas.height,
   );
   ctx.putImageData(imageData, 0, 0);
-  console.time("tick");
+  console.timeEnd("tick");
+  requestAnimationFrame(tick);
+}
+
+function send(worker: Worker, msg: HostMessage) {
+  worker.postMessage(msg);
+}
+
+function render(worker: Worker) {
+  send(worker, { type: "render", params: renderParams });
+  return new Promise<void>((resolve) =>
+    worker.addEventListener("message", function handler(event) {
+      const msg = event.data as WorkerMessage;
+      if (msg.type === "render") {
+        resolve();
+        worker.removeEventListener("message", handler);
+      }
+    })
+  );
 }
