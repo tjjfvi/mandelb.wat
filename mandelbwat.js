@@ -23,7 +23,7 @@ const workers = Array.from({
     });
     return worker;
 });
-const renderParams = {
+const params = {
     width: canvas.width,
     height: canvas.height,
     center_x: -0.101096363845,
@@ -34,10 +34,22 @@ let lastTick = Date.now();
 tick();
 async function tick() {
     console.time("tick");
-    renderParams.scale /= 1.05 ** ((Date.now() - lastTick) / 100);
+    params.scale /= 1.05 ** ((Date.now() - lastTick) / 100);
     lastTick = Date.now();
-    await Promise.all(workers.map(render));
-    const imageData = new ImageData(new Uint8ClampedArray(memory.buffer, 0, canvas.width * canvas.height * 4).slice(), canvas.width, canvas.height);
+    await Promise.all(workers.map(async (worker)=>{
+        send(worker, {
+            type: "render",
+            params
+        });
+        await done(worker);
+    }));
+    send(workers[0], {
+        type: "draw",
+        params
+    });
+    await done(workers[0]);
+    let x = canvas.width * canvas.height * 4;
+    const imageData = new ImageData(new Uint8ClampedArray(memory.buffer, x * 2, x).slice(), canvas.width, canvas.height);
     ctx.putImageData(imageData, 0, 0);
     console.timeEnd("tick");
     requestAnimationFrame(tick);
@@ -45,14 +57,10 @@ async function tick() {
 function send(worker, msg) {
     worker.postMessage(msg);
 }
-function render(worker) {
-    send(worker, {
-        type: "render",
-        params: renderParams
-    });
+function done(worker) {
     return new Promise((resolve)=>worker.addEventListener("message", function handler(event) {
             const msg = event.data;
-            if (msg.type === "render") {
+            if (msg.type === "done") {
                 resolve();
                 worker.removeEventListener("message", handler);
             }

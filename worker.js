@@ -54,10 +54,16 @@ self.addEventListener("message", async (event)=>{
     const wasm = await wasmPromise;
     if (msg.type === "render") {
         const { width , height , center_x , center_y , scale  } = msg.params;
-        wasm.draw(width, height, center_x, center_y, scale);
+        wasm.calc(width, height, center_x, center_y, scale);
         send({
-            type: "render",
-            buffer: wasm.memory.buffer
+            type: "done"
+        });
+    }
+    if (msg.type === "draw") {
+        const { width: width1 , height: height1  } = msg.params;
+        wasm.draw(width1, height1);
+        send({
+            type: "done"
         });
     }
 });

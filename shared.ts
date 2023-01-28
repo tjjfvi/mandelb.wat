@@ -12,13 +12,14 @@ export type WasmImports = {
 
 export interface WasmExports {
   memory: WebAssembly.Memory;
-  draw(
+  calc(
     width: number,
     height: number,
     center_x: number,
     center_y: number,
     scale: number,
   ): void;
+  draw(width: number, height: number): void;
 }
 
 export interface WorkerCtx {
@@ -35,12 +36,13 @@ export type HostMessage =
   | {
     type: "render";
     params: RenderParams;
+  }
+  | {
+    type: "draw";
+    params: RenderParams;
   };
 
-export type WorkerMessage = {
-  type: "render";
-  buffer: SharedArrayBuffer;
-};
+export type WorkerMessage = { type: "done" };
 
 export interface RenderParams {
   width: number;
