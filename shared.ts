@@ -15,9 +15,12 @@ export interface WasmExports {
   calc(
     width: number,
     height: number,
-    center_x: number,
-    center_y: number,
-    scale: number,
+    cx: number,
+    cy: number,
+    cs: number,
+    zx: number,
+    zy: number,
+    zs: number,
   ): void;
   draw(width: number, height: number): void;
 }
@@ -34,20 +37,12 @@ export type HostMessage =
     ctx: WorkerCtx;
   }
   | {
-    type: "render";
-    params: RenderParams;
+    type: "calc";
+    params: Parameters<WasmExports["calc"]>;
   }
   | {
     type: "draw";
-    params: RenderParams;
+    params: Parameters<WasmExports["draw"]>;
   };
 
 export type WorkerMessage = { type: "done" };
-
-export interface RenderParams {
-  width: number;
-  height: number;
-  center_x: number;
-  center_y: number;
-  scale: number;
-}
