@@ -68,13 +68,14 @@ class Fractal {
 
   async tick() {
     console.time(this.key);
-    const imageSize = this.canvas.width * this.canvas.height * 4;
+    const { width, height } = this.canvas;
+    const imageSize = width * height * 4;
     await Promise.all(this.workers.map(async (worker) => {
       send(worker, {
         type: "calc",
         params: [
-          this.canvas.width,
-          this.canvas.height,
+          width,
+          height,
           this.pos.c.x,
           this.pos.c.y,
           this.key === "c" ? this.pos.c.s : 0,
@@ -87,18 +88,18 @@ class Fractal {
     }));
     send(this.workers[0], {
       type: "draw",
-      params: [this.canvas.width, this.canvas.height],
+      params: [width, height],
     });
     await done(this.workers[0]);
-    console.log(imageSize, this.canvas.width, this.canvas.height);
+    console.log(imageSize, width, height);
     const imageData = new ImageData(
       new Uint8ClampedArray(
         this.memory.buffer,
         imageSize * 2,
         imageSize,
       ).slice(),
-      this.canvas.width,
-      this.canvas.height,
+      width,
+      height,
     );
     this.ctx.putImageData(imageData, 0, 0);
     console.timeEnd(this.key);
