@@ -52,7 +52,6 @@
         (local.set $c (i32.const 0))
       ) (else
         (local.set $v (f64.sub (local.get $min) (local.get $v)))
-        ;; (i32.trunc_f64_u (f64.mul (f64.div (f64.sub (local.get $v) (local.get $min)) (f64.sub (local.get $max) (local.get $min))) (f64.const 255)))
         (i32.sub (i32.const 255) (i32.trunc_f64_u (f64.mul (call $exp2 (f64.div (local.get $v) (f64.const 16))) (f64.const 255))))
         (local.set $c)
       ))
@@ -89,6 +88,7 @@
     (local $cz f64)
     (local $cw f64)
     (local $i i32)
+    (local $io i32)
     (local $j i32)
     (local $hi f64)
     (local $hj f64)
@@ -96,15 +96,15 @@
     (local $row_len i32)
     (local $grid_len i32)
 
-    (local.set $j (i32.shl (global.get $id) (i32.const 3)))
+    (local.set $io (i32.shl (global.get $id) (i32.const 3)))
     (local.set $chunk_len (i32.shl (global.get $count) (i32.const 3)))
 
     (local.set $hi (f64.mul (f64.convert_i32_u (local.get $width)) (f64.const 0.5)))
     (local.set $hj (f64.mul (f64.convert_i32_u (local.get $height)) (f64.const 0.5)))
-    (local.set $x (f64.sub (f64.sub (local.get $x) (f64.mul (local.get $hi) (local.get $ix))) (f64.mul (local.get $hj (local.get $jx)))))
-    (local.set $y (f64.sub (f64.sub (local.get $y) (f64.mul (local.get $hi) (local.get $iy))) (f64.mul (local.get $hj (local.get $jy)))))
-    (local.set $z (f64.sub (f64.sub (local.get $z) (f64.mul (local.get $hi) (local.get $iz))) (f64.mul (local.get $hj (local.get $jz)))))
-    (local.set $w (f64.sub (f64.sub (local.get $w) (f64.mul (local.get $hi) (local.get $iw))) (f64.mul (local.get $hj (local.get $jw)))))
+    (local.set $x (f64.sub (f64.sub (local.get $x) (f64.mul (local.get $hi) (local.get $ix))) (f64.mul (local.get $hj) (local.get $jx))))
+    (local.set $y (f64.sub (f64.sub (local.get $y) (f64.mul (local.get $hi) (local.get $iy))) (f64.mul (local.get $hj) (local.get $jy))))
+    (local.set $z (f64.sub (f64.sub (local.get $z) (f64.mul (local.get $hi) (local.get $iz))) (f64.mul (local.get $hj) (local.get $jz))))
+    (local.set $w (f64.sub (f64.sub (local.get $w) (f64.mul (local.get $hi) (local.get $iw))) (f64.mul (local.get $hj) (local.get $jw))))
 
     (local.tee $row_len (i32.shl (local.get $width) (i32.const 3)))
     (local.set $grid_len (i32.mul (local.get $height)))
@@ -124,7 +124,7 @@
       (local.set $cy (local.get $y))
       (local.set $cz (local.get $z))
       (local.set $cw (local.get $w))
-      (local.set $i (local.get $j))
+      (local.set $i (i32.add (local.get $j) (local.get $io)))
       (local.tee $j (i32.add (local.get $j) (local.get $row_len)))
       (loop $x
         (f64.store (local.get $i) (call $calc_point (local.get $cx) (local.get $cy) (local.get $cz) (local.get $cw)))
@@ -144,45 +144,10 @@
     )
   )
 
-  ;; (func $draw_pixel
-  ;;   (param $x f64) (param $y f64) (param $i i32)
-  ;;   (local $o f64)
-
-  ;;   (local.tee $o (call $point (local.get $x) (local.get $y)))
-
-  ;;   (if (f64.eq (f64.const -1)) (then
-  ;;     (i32.store (local.get $i) (i32.const 0xff000000))
-  ;;   ) (else
-      
-  ;;     (i32.store8 offset=0 (local.get $i) (call $color_f (f64.const 0) (local.get $y)))
-  ;;     (i32.store8 offset=1 (local.get $i) (call $color_f (f64.const 8) (local.get $y)))
-  ;;     (i32.store8 offset=2 (local.get $i) (call $color_f (f64.const 4) (local.get $y)))
-  ;;     (i32.store8 offset=3 (local.get $i) (i32.const 255))
-  ;;   ))
-  ;; )
-
-  ;; (func $color_f (param $n f64) (param $v f64) (result i32)
-  ;;   (local.set $n (f64.add (local.get $n) (f64.mul (local.get $v) (f64.const 12))))
-  ;;   (loop $mod (if (f64.ge (local.get $n) (f64.const 12)) (then
-  ;;     (local.set $n (f64.sub (local.get $n) (f64.const 12)))
-  ;;     (br $mod)
-  ;;   )))
-
-  ;;   (f64.sub (f64.const 0.5) (f64.max (f64.const -0.5) (f64.min (f64.const 0.5) (f64.min
-  ;;     (f64.sub (local.get $n) (f64.const 3))
-  ;;     (f64.sub (f64.const 9) (local.get $n))
-  ;;   ))))
-
-  ;;   (i32.trunc_f64_u (f64.mul (f64.const 255)))
-  ;; )
-  
   (func $calc_point (param $cx f64) (param $cy f64) (param $zx f64) (param $zy f64) (result f64)
     (local $zx2 f64) (local $zy2 f64)
     (local $pzx f64) (local $pzy f64)
     (local $i i32) (local $o f64)
-
-    ;; (local.set $cx (f64.const -0.5))
-    ;; (local.set $cy (f64.const -0.6))
 
     (local.set $o (f64.const 1))
     (local.set $pzx (local.get $zx))
@@ -260,10 +225,12 @@
     (f64.add (f64.const 1))
     (f64.mul)
   )
+
   (func $i64_min_s (param $x i64) (param $y i64) (result i64)
     (if (i64.gt_s (local.get $x) (local.get $y)) (then (local.set $x (local.get $y))))
     (local.get $x)
   )
+
   (func $i64_max_s (param $x i64) (param $y i64) (result i64)
     (if (i64.lt_s (local.get $x) (local.get $y)) (then (local.set $x (local.get $y))))
     (local.get $x)

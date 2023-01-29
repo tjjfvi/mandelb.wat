@@ -1,35 +1,9 @@
 /// <reference lib="dom"/>
 
-import { Matrix5 } from "./matrix.ts";
-import { HostMessage, WorkerMessage } from "./shared.ts";
+import { Matrix } from "./matrix.ts";
+import { CalcParams, HostMessage, WorkerMessage } from "./shared.ts";
 
-interface Position {
-  c: {
-    x: number;
-    y: number;
-    s: number;
-  };
-  z: {
-    x: number;
-    y: number;
-    s: number;
-  };
-}
-
-let transform = Matrix5.mul(
-  Matrix5.scale(.003125),
-  Matrix5.identity,
-  // [
-  //   [0, 0, 1, 0, 0],
-  //   [0, 0, 0, 1, 0],
-  //   [1, 0, 0, 0, 0],
-  //   [0, 1, 0, 0, 0],
-  //   [0, 0, 0, 0, 1],
-  // ],
-);
-
-class Fractal {
-  ctx;
+class WorkerGroup {
   memory = new WebAssembly.Memory({
     initial: 2048,
     maximum: 2048,
@@ -45,137 +19,31 @@ class Fractal {
     return worker;
   });
 
-  constructor(
-    public canvas: HTMLCanvasElement,
-    public key: "z" | "c",
-  ) {
-    this.ctx = this.canvas.getContext("2d")!;
-
-    let drag: [boolean, number, number, Matrix5] | undefined;
-    canvas.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-    });
-    canvas.addEventListener("mousedown", (e) => {
-      console.log(e.button);
-      drag = [e.button === 0, e.clientX, e.clientY, transform];
-    });
-    canvas.addEventListener("mouseup", (e) => {
-      console.log(e.button);
-      drag = undefined;
-    });
-    canvas.addEventListener("mousemove", (e) => {
-      if (drag) {
-        let base = [drag[1] - e.clientX, drag[2] - e.clientY] as const;
-        const horiz = base[0] ** 2 > base[1] ** 2;
-        if (e.shiftKey || !drag[0]) {
-          if (Math.max(Math.abs(base[0]), Math.abs(base[1])) > 10) {
-            if (horiz) {
-              drag[2] = e.clientY;
-            } else {
-              drag[1] = e.clientX;
-            }
-          }
-          base = horiz ? [base[0], 0] : [0, base[1]];
-        }
-        if (drag[0]) {
-          transform = Matrix5.mul(
-            drag[3],
-            Matrix5.translate(
-              (this.key === "c") === (drag[0])
-                ? [...base, 0, 0]
-                : [0, 0, ...base],
-            ),
-          );
-        } else {
-          const angle = (horiz ? base[0] : base[1]) / 100;
-          const cos = Math.cos(angle);
-          const sin = Math.sin(angle);
-          transform = Matrix5.mul(
-            drag[3],
-            this.key === "c"
-              ? horiz
-                ? [
-                  [cos, 0, sin, 0, 0],
-                  [0, 1, 0, 0, 0],
-                  [-sin, 0, cos, 0, 0],
-                  [0, 0, 0, 1, 0],
-                  [0, 0, 0, 0, 1],
-                ]
-                : [
-                  [1, 0, 0, 0, 0],
-                  [0, cos, 0, sin, 0],
-                  [0, 0, 1, 0, 0],
-                  [0, -sin, 0, cos, 0],
-                  [0, 0, 0, 0, 1],
-                ]
-              : horiz
-              ? [
-                [1, 0, 0, 0, 0],
-                [0, cos, -sin, 0, 0],
-                [0, sin, cos, 0, 0],
-                [0, 0, 0, 1, 0],
-                [0, 0, 0, 0, 1],
-              ]
-              : [
-                [cos, 0, 0, -sin, 0],
-                [0, 1, 0, 0, 0],
-                [0, 0, 1, 0, 0],
-                [sin, 0, 0, cos, 0],
-                [0, 0, 0, 0, 1],
-              ],
-          );
-        }
-      }
-    });
-
-    canvas.addEventListener("wheel", (e) => {
-      if (drag) drag = [drag[0], e.clientX, e.clientY, transform];
-      transform = Matrix5.mul(
-        transform,
-        Matrix5.scale(1.001 ** e.deltaY),
-      );
-    });
-
-    canvas.addEventListener("dblclick", () => {
-      drag = undefined;
-      position[key] = { ...initial[key] };
-    });
+  ctx;
+  constructor(public canvas: HTMLCanvasElement) {
+    this.ctx = canvas.getContext("2d")!;
   }
 
-  async tick() {
-    console.time(this.key);
-    const { width, height } = this.canvas;
+  rendering = false;
+  queuedRender?: CalcParams;
+  render(...params: CalcParams): void;
+  async render(...params: CalcParams) {
+    if (this.rendering) {
+      this.queuedRender = params;
+      return;
+    }
+    this.rendering = true;
+    const [width, height] = params;
     const imageSize = width * height * 4;
-    await Promise.all(this.workers.map(async (worker) => {
-      send(worker, {
-        type: "calc",
-        params: [
-          width,
-          height,
-          ...Matrix5.apply(
-            transform,
-            [0, 0, 0, 0],
-          ),
-          ...Matrix5.apply(
-            transform,
-            this.key === "c" ? [1, 0, 0, 0] : [0, 0, 1, 0],
-            false,
-          ),
-          ...Matrix5.apply(
-            transform,
-            this.key === "c" ? [0, 1, 0, 0] : [0, 0, 0, 1],
-            false,
-          ),
-        ],
-      });
-      await done(worker);
-    }));
-    send(this.workers[0], {
-      type: "draw",
-      params: [width, height],
-    });
+    await Promise.all(
+      this.workers.map(async (worker) => {
+        send(worker, { type: "calc", params });
+        await done(worker);
+      }),
+    );
+    send(this.workers[0], { type: "draw", params: [width, height] });
     await done(this.workers[0]);
-    const imageData = new ImageData(
+    const img = new ImageData(
       new Uint8ClampedArray(
         this.memory.buffer,
         imageSize * 2,
@@ -184,57 +52,115 @@ class Fractal {
       width,
       height,
     );
-    this.ctx.putImageData(imageData, 0, 0);
-    console.timeEnd(this.key);
-    requestAnimationFrame(() => this.tick());
+    this.ctx.putImageData(img, 0, 0);
+    this.rendering = false;
+    if (this.queuedRender) {
+      params = this.queuedRender;
+      this.queuedRender = undefined;
+      this.render(...params);
+    }
   }
 }
-// params:
-// RenderParams = {
-//   width: canvas.width,
-//   height: canvas.height,
-//   cx: -.75,
-//   cy: 0,
-//   zs: .003125,
-//   zx: 0,
-//   zy: 0,
-//   cs: .003125,
-// };
 
-const initial: Position = {
-  c: {
-    x: 0,
-    y: 0,
-    s: 0.003125 * 3,
-  },
-  z: {
-    x: 0,
-    y: 0,
-    s: 0.003125 * 3,
-  },
-};
+const body = document.body;
 
-const position: Position = {
-  c: { ...initial.c },
-  z: { ...initial.z },
-};
+body.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+});
 
-const mandelbrot = new Fractal(
-  document.getElementById("mandelbrot") as HTMLCanvasElement,
-  "c",
+let transform = Matrix.mul(
+  Matrix.scale(.003125),
+  Matrix.identity,
 );
-const julia = new Fractal(
-  document.getElementById("julia") as HTMLCanvasElement,
-  "z",
+
+let width = 0;
+let height = 0;
+const ab = new WorkerGroup(
+  document.getElementById("ab") as HTMLCanvasElement,
+);
+const cd = new WorkerGroup(
+  document.getElementById("cd") as HTMLCanvasElement,
 );
 
 resize();
+render();
 
-// deno-lint-ignore no-window-prefix
 window.addEventListener("resize", resize);
 
-mandelbrot.tick();
-julia.tick();
+interface DragState {
+  target: "ab" | "cd";
+  lock: boolean;
+  axis?: 0 | 1;
+  rotate: boolean;
+  reference: [number, number];
+  base: Matrix;
+}
+
+let drag: DragState | undefined;
+
+body.addEventListener("mousedown", (e) => {
+  const rotate = e.button === 2;
+  (e.target! as HTMLElement).classList.add("active");
+  drag = {
+    target: e.target === ab.canvas ? "ab" : "cd",
+    lock: rotate || e.shiftKey,
+    rotate,
+    reference: [e.clientX, e.clientY],
+    base: transform,
+  };
+});
+
+body.addEventListener("mouseup", (e) => {
+  if (!drag) return;
+  (drag.target === "ab" ? ab : cd).canvas.classList.remove("active");
+  drag = undefined;
+});
+
+body.addEventListener("mousemove", (e) => {
+  if (!drag) return;
+  let delta: [number, number] = [
+    drag.reference[0] - e.clientX,
+    drag.reference[1] - e.clientY,
+  ];
+  if (drag.lock) {
+    if (drag.axis === undefined) {
+      const a0 = Math.abs(delta[0]);
+      const a1 = Math.abs(delta[1]);
+      if (a0 > 20 || a1 > 20) {
+        drag.axis = Math.abs(delta[0]) > Math.abs(delta[1]) ? 0 : 1;
+      }
+    }
+    if (drag.axis !== undefined) {
+      delta[1 - drag.axis] = 0;
+    }
+  }
+  if (!drag.rotate) {
+    transform = Matrix.mul(
+      drag.base,
+      Matrix.translate(
+        drag.target === "ab" ? [...delta, 0, 0] : [0, 0, ...delta],
+      ),
+    );
+  } else if (drag.axis !== undefined) {
+    const angle = delta[drag.axis] / 100;
+    transform = Matrix.mul(
+      drag.base,
+      drag.target === "ab"
+        ? (drag.axis === 0 ? Matrix.rotateXZ(angle) : Matrix.rotateYW(angle))
+        : (drag.axis === 0 ? Matrix.rotateZY(angle) : Matrix.rotateWX(angle)),
+    );
+  }
+  render();
+});
+
+body.addEventListener("wheel", (e) => {
+  drag = undefined;
+  transform = Matrix.mul(
+    transform,
+    Matrix.scale(1.001 ** e.deltaY),
+  );
+  render();
+});
 
 function send(worker: Worker, msg: HostMessage) {
   worker.postMessage(msg);
@@ -253,6 +179,13 @@ function done(worker: Worker) {
 }
 
 function resize() {
-  mandelbrot.canvas.width = julia.canvas.width = (window.innerWidth / 2) | 0;
-  mandelbrot.canvas.height = julia.canvas.height = window.innerHeight;
+  width = ab.canvas.width = cd.canvas.width = (window.innerWidth / 2) | 0;
+  height = ab.canvas.height = cd.canvas.height = window.innerHeight;
+  render();
+}
+
+function render() {
+  const [a, b, c, d, x] = transform;
+  ab.render(width, height, ...x, ...a, ...b);
+  cd.render(width, height, ...x, ...c, ...d);
 }

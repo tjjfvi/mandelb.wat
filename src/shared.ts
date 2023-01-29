@@ -37,6 +37,8 @@ export interface WorkerCtx {
   memory: WebAssembly.Memory;
 }
 
+export type CalcParams = Parameters<WasmExports["calc"]>;
+export type DrawParams = Parameters<WasmExports["draw"]>;
 export type HostMessage =
   | {
     type: "init";
@@ -44,11 +46,11 @@ export type HostMessage =
   }
   | {
     type: "calc";
-    params: Parameters<WasmExports["calc"]>;
+    params: CalcParams;
   }
   | {
     type: "draw";
-    params: Parameters<WasmExports["draw"]>;
+    params: DrawParams;
   };
 
 export type WorkerMessage = { type: "done" };

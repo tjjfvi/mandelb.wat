@@ -1,65 +1,112 @@
-export type Vector4 = [number, number, number, number];
-export type Matrix5 = [
-  [number, number, number, number, number],
-  [number, number, number, number, number],
-  [number, number, number, number, number],
-  [number, number, number, number, number],
-  [number, number, number, number, number],
+export type Vector = [number, number, number, number];
+export namespace Vector {
+  export const zero: Vector = [0, 0, 0, 0];
+  export const x: Vector = [1, 0, 0, 0];
+  export const y: Vector = [0, 1, 0, 0];
+  export const z: Vector = [0, 0, 1, 0];
+  export const w: Vector = [0, 0, 0, 1];
+}
+
+export type Matrix = [
+  Vector,
+  Vector,
+  Vector,
+  Vector,
+  Vector,
 ];
 
-export namespace Matrix5 {
-  export const identity: Matrix5 = [
-    [1, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0],
-    [0, 0, 1, 0, 0],
-    [0, 0, 0, 1, 0],
-    [0, 0, 0, 0, 1],
+export namespace Matrix {
+  export const identity: Matrix = [
+    Vector.x,
+    Vector.y,
+    Vector.z,
+    Vector.w,
+    Vector.zero,
   ];
 
-  export function scale(f: number): Matrix5 {
+  export function scale(f: number): Matrix {
     return [
-      [f, 0, 0, 0, 0],
-      [0, f, 0, 0, 0],
-      [0, 0, f, 0, 0],
-      [0, 0, 0, f, 0],
-      [0, 0, 0, 0, 1],
+      [f, 0, 0, 0],
+      [0, f, 0, 0],
+      [0, 0, f, 0],
+      [0, 0, 0, f],
+      Vector.zero,
     ];
   }
 
-  export function translate(v: Vector4): Matrix5 {
+  export function translate(v: Vector): Matrix {
     return [
-      [1, 0, 0, 0, v[0]],
-      [0, 1, 0, 0, v[1]],
-      [0, 0, 1, 0, v[2]],
-      [0, 0, 0, 1, v[3]],
-      [0, 0, 0, 0, 1],
+      Vector.x,
+      Vector.y,
+      Vector.z,
+      Vector.w,
+      v,
     ];
   }
 
-  export function mul(a: Matrix5, b: Matrix5): Matrix5 {
-    return Array.from(
-      { length: 5 },
-      (_, i) => Array.from({ length: 5 }, (_, j) => get(i, j)),
-    ) as Matrix5;
+  export function mul(a: Matrix, b: Matrix): Matrix {
+    return [
+      [get(0, 0), get(0, 1), get(0, 2), get(0, 3)],
+      [get(1, 0), get(1, 1), get(1, 2), get(1, 3)],
+      [get(2, 0), get(2, 1), get(2, 2), get(2, 3)],
+      [get(3, 0), get(3, 1), get(3, 2), get(3, 3)],
+      [get(4, 0), get(4, 1), get(4, 2), get(4, 3)],
+    ];
     function get(i: number, j: number) {
       return 0 +
-        a[i][0] * b[0][j] +
-        a[i][1] * b[1][j] +
-        a[i][2] * b[2][j] +
-        a[i][3] * b[3][j] +
-        a[i][4] * b[4][j];
+        a[0][j] * b[i][0] +
+        a[1][j] * b[i][1] +
+        a[2][j] * b[i][2] +
+        a[3][j] * b[i][3] +
+        a[4][j] * +(i === 4);
     }
   }
 
-  export function apply(m: Matrix5, v: Vector4, trans = true): Vector4 {
-    return Array.from({ length: 4 }, (_, i) => get(i)) as Vector4;
-    function get(i: number) {
-      return 0 +
-        m[i][0] * v[0] +
-        m[i][1] * v[1] +
-        m[i][2] * v[2] +
-        m[i][3] * v[3] +
-        (trans ? m[i][4] : 0);
-    }
+  export function rotateXZ(angle: number): Matrix {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return [
+      [cos, 0, -sin, 0],
+      [0, 1, 0, 0],
+      [sin, 0, cos, 0],
+      [0, 0, 0, 1],
+      [0, 0, 0, 0],
+    ];
+  }
+
+  export function rotateYW(angle: number): Matrix {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return [
+      [1, 0, 0, 0],
+      [0, cos, 0, -sin],
+      [0, 0, 1, 0],
+      [0, sin, 0, cos],
+      [0, 0, 0, 0],
+    ];
+  }
+
+  export function rotateZY(angle: number): Matrix {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return [
+      [1, 0, 0, 0],
+      [0, cos, sin, 0],
+      [0, -sin, cos, 0],
+      [0, 0, 0, 1],
+      [0, 0, 0, 0],
+    ];
+  }
+
+  export function rotateWX(angle: number): Matrix {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return [
+      [cos, 0, 0, sin],
+      [0, 1, 0, 0],
+      [0, 0, 1, 0],
+      [-sin, 0, 0, cos],
+      [0, 0, 0, 0],
+    ];
   }
 }
