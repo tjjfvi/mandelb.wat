@@ -91,7 +91,6 @@ class Fractal {
       params: [width, height],
     });
     await done(this.workers[0]);
-    console.log(imageSize, width, height);
     const imageData = new ImageData(
       new Uint8ClampedArray(
         this.memory.buffer,
