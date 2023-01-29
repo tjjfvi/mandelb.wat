@@ -1,0 +1,24 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v2
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - name: Download wabt
+        run: |
+          curl -L https://github.com/WebAssembly/wabt/releases/download/1.0.30/wabt-1.0.30-ubuntu.tar.gz | tar -xz -C ~
+          echo "$HOME/wabt-1.0.30/bin" >> $GITHUB_PATH
+      - run: deno task build
+      - uses: denoland/deployctl@v1
+        with:
+          project: mandelbwat
+          entrypoint: server.ts

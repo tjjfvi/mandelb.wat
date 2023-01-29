@@ -1,7 +1,7 @@
 {
   "lock": false,
   "tasks": {
-    "dev": "deno run -A --watch=src/ dev.ts",
+    "dev": "DEV=1 deno run -A --watch=src/ server.ts",
     "build": "deno task wasm && deno task js:host && deno task js:worker",
     "wasm": "wat2wasm --enable-threads src/mandelb.wat --output static/mandelb.wasm",
     "js:host": "deno bundle --no-check src/host.ts static/host.js",
