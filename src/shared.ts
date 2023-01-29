@@ -15,12 +15,18 @@ export interface WasmExports {
   calc(
     width: number,
     height: number,
-    cx: number,
-    cy: number,
-    cs: number,
-    zx: number,
-    zy: number,
-    zs: number,
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    ix: number,
+    iy: number,
+    iz: number,
+    iw: number,
+    jx: number,
+    jy: number,
+    jz: number,
+    jw: number,
   ): void;
   draw(width: number, height: number): void;
 }

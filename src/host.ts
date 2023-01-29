@@ -1,5 +1,6 @@
 /// <reference lib="dom"/>
 
+import { Matrix5 } from "./matrix.ts";
 import { HostMessage, WorkerMessage } from "./shared.ts";
 
 interface Position {
@@ -14,6 +15,18 @@ interface Position {
     s: number;
   };
 }
+
+let transform = Matrix5.mul(
+  Matrix5.scale(.003125),
+  Matrix5.identity,
+  // [
+  //   [0, 0, 1, 0, 0],
+  //   [0, 0, 0, 1, 0],
+  //   [1, 0, 0, 0, 0],
+  //   [0, 1, 0, 0, 0],
+  //   [0, 0, 0, 0, 1],
+  // ],
+);
 
 class Fractal {
   ctx;
@@ -33,35 +46,98 @@ class Fractal {
   });
 
   constructor(
-    public pos: Position,
     public canvas: HTMLCanvasElement,
     public key: "z" | "c",
   ) {
     this.ctx = this.canvas.getContext("2d")!;
 
-    let dragging = false;
-    let drag = [0, 0, 0, 0] satisfies [] | number[];
-    canvas.addEventListener("mousedown", (e) => {
-      dragging = true;
-      drag = [e.clientX, e.clientY, position[key].x, position[key].y];
+    let drag: [boolean, number, number, Matrix5] | undefined;
+    canvas.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
     });
-    canvas.addEventListener("mouseup", () => {
-      dragging = false;
+    canvas.addEventListener("mousedown", (e) => {
+      console.log(e.button);
+      drag = [e.button === 0, e.clientX, e.clientY, transform];
+    });
+    canvas.addEventListener("mouseup", (e) => {
+      console.log(e.button);
+      drag = undefined;
     });
     canvas.addEventListener("mousemove", (e) => {
-      if (dragging) {
-        position[key].x = drag[2] - (e.clientX - drag[0]) * position[key].s;
-        position[key].y = drag[3] - (e.clientY - drag[1]) * position[key].s;
+      if (drag) {
+        let base = [drag[1] - e.clientX, drag[2] - e.clientY] as const;
+        const horiz = base[0] ** 2 > base[1] ** 2;
+        if (e.shiftKey || !drag[0]) {
+          if (Math.max(Math.abs(base[0]), Math.abs(base[1])) > 10) {
+            if (horiz) {
+              drag[2] = e.clientY;
+            } else {
+              drag[1] = e.clientX;
+            }
+          }
+          base = horiz ? [base[0], 0] : [0, base[1]];
+        }
+        if (drag[0]) {
+          transform = Matrix5.mul(
+            drag[3],
+            Matrix5.translate(
+              (this.key === "c") === (drag[0])
+                ? [...base, 0, 0]
+                : [0, 0, ...base],
+            ),
+          );
+        } else {
+          const angle = (horiz ? base[0] : base[1]) / 100;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          transform = Matrix5.mul(
+            drag[3],
+            this.key === "c"
+              ? horiz
+                ? [
+                  [cos, 0, sin, 0, 0],
+                  [0, 1, 0, 0, 0],
+                  [-sin, 0, cos, 0, 0],
+                  [0, 0, 0, 1, 0],
+                  [0, 0, 0, 0, 1],
+                ]
+                : [
+                  [1, 0, 0, 0, 0],
+                  [0, cos, 0, sin, 0],
+                  [0, 0, 1, 0, 0],
+                  [0, -sin, 0, cos, 0],
+                  [0, 0, 0, 0, 1],
+                ]
+              : horiz
+              ? [
+                [1, 0, 0, 0, 0],
+                [0, cos, -sin, 0, 0],
+                [0, sin, cos, 0, 0],
+                [0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1],
+              ]
+              : [
+                [cos, 0, 0, -sin, 0],
+                [0, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0],
+                [sin, 0, 0, cos, 0],
+                [0, 0, 0, 0, 1],
+              ],
+          );
+        }
       }
     });
 
     canvas.addEventListener("wheel", (e) => {
-      drag = [e.clientX, e.clientY, position.c.x, position.c.y];
-      position[key].s *= 1.001 ** e.deltaY;
+      if (drag) drag = [drag[0], e.clientX, e.clientY, transform];
+      transform = Matrix5.mul(
+        transform,
+        Matrix5.scale(1.001 ** e.deltaY),
+      );
     });
 
     canvas.addEventListener("dblclick", () => {
-      dragging = false;
+      drag = undefined;
       position[key] = { ...initial[key] };
     });
   }
@@ -76,12 +152,20 @@ class Fractal {
         params: [
           width,
           height,
-          this.pos.c.x,
-          this.pos.c.y,
-          this.key === "c" ? this.pos.c.s : 0,
-          this.pos.z.x,
-          this.pos.z.y,
-          this.key === "z" ? this.pos.z.s : 0,
+          ...Matrix5.apply(
+            transform,
+            [0, 0, 0, 0],
+          ),
+          ...Matrix5.apply(
+            transform,
+            this.key === "c" ? [1, 0, 0, 0] : [0, 0, 1, 0],
+            false,
+          ),
+          ...Matrix5.apply(
+            transform,
+            this.key === "c" ? [0, 1, 0, 0] : [0, 0, 0, 1],
+            false,
+          ),
         ],
       });
       await done(worker);
@@ -121,12 +205,12 @@ const initial: Position = {
   c: {
     x: 0,
     y: 0,
-    s: 0.003125,
+    s: 0.003125 * 3,
   },
   z: {
     x: 0,
     y: 0,
-    s: 0.003125,
+    s: 0.003125 * 3,
   },
 };
 
@@ -136,12 +220,10 @@ const position: Position = {
 };
 
 const mandelbrot = new Fractal(
-  position,
   document.getElementById("mandelbrot") as HTMLCanvasElement,
   "c",
 );
 const julia = new Fractal(
-  position,
   document.getElementById("julia") as HTMLCanvasElement,
   "z",
 );

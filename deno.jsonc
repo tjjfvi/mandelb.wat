@@ -1,4 +1,9 @@
 {
+  "lint": {
+    "files": {
+      "exclude": ["src/"]
+    }
+  },
   "lock": false,
   "tasks": {
     "dev": "DEV=1 deno run -A --watch=src/ server.ts",
