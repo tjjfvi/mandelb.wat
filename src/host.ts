@@ -2,6 +2,7 @@
 
 import { Matrix } from "./matrix.ts";
 import { CalcParams, HostMessage, WorkerMessage } from "./shared.ts";
+import lzstring from "https://esm.sh/lz-string@1.4.4";
 
 class WorkerGroup {
   memory = new WebAssembly.Memory({
@@ -68,10 +69,18 @@ body.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-let transform = Matrix.mul(
+let transform = parseHash() ?? Matrix.mul(
   Matrix.scale(.003125),
   Matrix.identity,
 );
+
+window.addEventListener("keydown", (e) => {
+  console.log(e.code, e.ctrlKey, e.metaKey);
+  if (e.code === "KeyS" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    setHash();
+  }
+});
 
 let width = 0;
 let height = 0;
@@ -188,4 +197,27 @@ function render() {
   const [a, b, c, d, x] = transform;
   ab.render(width, height, ...x, ...a, ...b);
   cd.render(width, height, ...x, ...c, ...d);
+}
+
+function parseHash(): Matrix | undefined {
+  if (!location.hash) return undefined;
+  const data = (
+    lzstring.decompressFromEncodedURIComponent(
+      location.hash.slice(1),
+    )!
+  ).split(",").map((x) => +x);
+  return [
+    data.slice(0, 4),
+    data.slice(4, 8),
+    data.slice(8, 12),
+    data.slice(12, 16),
+    data.slice(16),
+  ] as Matrix;
+}
+
+function setHash() {
+  location.hash = "#" +
+    lzstring.compressToEncodedURIComponent(
+      transform.flat().join(","),
+    );
 }
