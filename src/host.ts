@@ -70,10 +70,12 @@ body.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-let transform = parseHash() ?? Matrix.mul(
+const defaultTransform = Matrix.mul(
   Matrix.scale(.003125),
   Matrix.identity,
 );
+
+let transform = parseHash() ?? defaultTransform;
 
 const setHash = debounce(_setHash, 100);
 
@@ -101,6 +103,14 @@ interface DragState {
 }
 
 let drag: DragState | undefined;
+
+body.addEventListener("keydown", (e) => {
+  if (e.key === "r") {
+    drag = undefined;
+    transform = defaultTransform;
+    render();
+  }
+});
 
 body.addEventListener("mousedown", (e) => {
   const rotate = e.button === 2;
