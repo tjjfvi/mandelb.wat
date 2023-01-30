@@ -15,7 +15,7 @@
   (export "escape2" (global $escape2))
   (export "max_iters" (global $max_iters))
   
-  (global $epsilon (mut f64) (f64.const 1e-12))
+  (global $epsilon (mut f64) (f64.const 1e-32))
   (export "epsilon" (global $epsilon))
 
   (func (export "draw")
