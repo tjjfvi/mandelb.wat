@@ -2,6 +2,7 @@
 
 import { Matrix } from "./matrix.ts";
 import { CalcParams, HostMessage, WorkerMessage } from "./shared.ts";
+import { debounce } from "https://deno.land/std@0.167.0/async/debounce.ts";
 import lzstring from "https://esm.sh/lz-string@1.4.4";
 
 class WorkerGroup {
@@ -74,13 +75,7 @@ let transform = parseHash() ?? Matrix.mul(
   Matrix.identity,
 );
 
-window.addEventListener("keydown", (e) => {
-  console.log(e.code, e.ctrlKey, e.metaKey);
-  if (e.code === "KeyS" && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    setHash();
-  }
-});
+const setHash = debounce(_setHash, 100);
 
 let width = 0;
 let height = 0;
@@ -197,6 +192,7 @@ function render() {
   const [a, b, c, d, x] = transform;
   ab.render(width, height, ...x, ...a, ...b);
   cd.render(width, height, ...x, ...c, ...d);
+  setHash();
 }
 
 function parseHash(): Matrix | undefined {
@@ -215,9 +211,13 @@ function parseHash(): Matrix | undefined {
   ] as Matrix;
 }
 
-function setHash() {
-  location.hash = "#" +
-    lzstring.compressToEncodedURIComponent(
-      transform.flat().join(","),
-    );
+function _setHash() {
+  history.replaceState(
+    {},
+    "",
+    "#" +
+      lzstring.compressToEncodedURIComponent(
+        transform.flat().join(","),
+      ),
+  );
 }
