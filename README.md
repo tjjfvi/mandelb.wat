@@ -26,6 +26,7 @@ Rotating the space causes the two panes to show different cross-sections of the
 Mandelbrot set. Rotations in 4D happen *within planes*[^1] (similar to a 2D
 rotations). In 4D, you can rotate in 6 independent planes. The viewer allows you
 to rotate in 4[^2]. To rotate in the...
+
 - *xz*-plane: drag horizontally on the left pane
 - *yw*-plane: drag vertically on the left pane
 - *zy*-plane: drag horizontally on the right pane
@@ -33,13 +34,14 @@ to rotate in 4[^2]. To rotate in the...
 
 The core calculations are implemented in hand-written WAT (WebAssembly Text
 format), which transpiles to WASM. The WAT takes:
+
 - the 4D coordinates of the center point
 - the 4D orientation
 - the scale factor
 - the output dimensions
 
-Using these, it calculates for each point in the view whether they are in or close to
-the set, and from this writes an image into its memory.
+Using these, it calculates for each point in the view whether they are in or
+close to the set, and from this writes an image into its memory.
 
 A frontend written in TypeScript calls the WASM in Web Workers to parallelize
 the rendering across many threads and render the image onto the screen.

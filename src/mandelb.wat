@@ -14,13 +14,13 @@
   (global $max_iters (mut i32) (i32.const 1024))
   (export "escape2" (global $escape2))
   (export "max_iters" (global $max_iters))
-  
+
   (global $epsilon (mut f64) (f64.const 1e-32))
   (export "epsilon" (global $epsilon))
 
   (func (export "draw")
-    (param $width i32)    
-    (param $height i32)    
+    (param $width i32)
+    (param $height i32)
 
     (local $min f64)
     (local $max f64)
@@ -48,7 +48,7 @@
     (local.set $j (local.get $im))
     (loop $j
       (local.tee $v (f64.load (local.get $i)))
-      (if (f64.eq (f64.const inf)) (then 
+      (if (f64.eq (f64.const inf)) (then
         (local.set $c (i32.const 0))
       ) (else
         (local.set $v (f64.sub (local.get $min) (local.get $v)))
@@ -66,10 +66,10 @@
       (br_if $j (i32.lt_u (local.get $im)))
     )
   )
-  
+
   (func (export "calc")
     (param $width i32)
-    (param $height i32)    
+    (param $height i32)
     (param $x f64)
     (param $y f64)
     (param $z f64)
@@ -197,7 +197,7 @@
     (f64.convert_i64_u)
     (local.get $b)
     (i64.and (i64.const 0x000fffffffffffff))
-    (i64.or  (i64.const 0x3ff0000000000000))
+    (i64.or (i64.const 0x3ff0000000000000))
     (f64.reinterpret_i64)
     (local.tee $n)
     (f64.mul (f64.const -0.0769658))
@@ -212,7 +212,9 @@
   )
 
   (func $exp2 (param $n f64) (result f64) (local $b i64)
-    (i64.shl (i64.add (call $i64_max_s (i64.const -1023) (call $i64_min_s (i64.const 1024) (i64.trunc_f64_s (local.get $n)))) (i64.const 1023)) (i64.const 52))
+    (call $i64_max_s (i64.const -1023) (call $i64_min_s (i64.const 1024) (i64.trunc_f64_s (local.get $n))))
+    (i64.add (i64.const 1023))
+    (i64.shl (i64.const 52))
     (f64.reinterpret_i64)
     (local.tee $n (f64.sub (local.get $n) (f64.trunc (local.get $n))))
     (f64.mul (f64.const 0.0136021))

@@ -1,17 +1,17 @@
 export type WasmImports = {
   ctx: {
-    memory: WebAssembly.Memory;
-    id: WebAssembly.Global;
-    count: WebAssembly.Global;
-  };
+    memory: WebAssembly.Memory
+    id: WebAssembly.Global
+    count: WebAssembly.Global
+  }
   log: {
-    u32: (value: number) => void;
-    f64: (value: number) => void;
-  };
-};
+    u32: (value: number) => void
+    f64: (value: number) => void
+  }
+}
 
 export interface WasmExports {
-  memory: WebAssembly.Memory;
+  memory: WebAssembly.Memory
   calc(
     width: number,
     height: number,
@@ -27,30 +27,30 @@ export interface WasmExports {
     jy: number,
     jz: number,
     jw: number,
-  ): void;
-  draw(width: number, height: number): void;
+  ): void
+  draw(width: number, height: number): void
 }
 
 export interface WorkerCtx {
-  id: number;
-  count: number;
-  memory: WebAssembly.Memory;
+  id: number
+  count: number
+  memory: WebAssembly.Memory
 }
 
-export type CalcParams = Parameters<WasmExports["calc"]>;
-export type DrawParams = Parameters<WasmExports["draw"]>;
+export type CalcParams = Parameters<WasmExports["calc"]>
+export type DrawParams = Parameters<WasmExports["draw"]>
 export type HostMessage =
   | {
-    type: "init";
-    ctx: WorkerCtx;
+    type: "init"
+    ctx: WorkerCtx
   }
   | {
-    type: "calc";
-    params: CalcParams;
+    type: "calc"
+    params: CalcParams
   }
   | {
-    type: "draw";
-    params: DrawParams;
-  };
+    type: "draw"
+    params: DrawParams
+  }
 
-export type WorkerMessage = { type: "done" };
+export type WorkerMessage = { type: "done" }
