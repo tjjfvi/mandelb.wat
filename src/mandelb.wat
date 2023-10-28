@@ -56,8 +56,8 @@
         (local.set $c)
       ))
 
-      (i32.store8 offset=0 (local.get $j) (i32.const 0))
-      (i32.store8 offset=1 (local.get $j) (i32.const 0))
+      (i32.store8 offset=0 (local.get $j) (local.get $c))
+      (i32.store8 offset=1 (local.get $j) (local.get $c))
       (i32.store8 offset=2 (local.get $j) (local.get $c))
       (i32.store8 offset=3 (local.get $j) (i32.const 255))
 
