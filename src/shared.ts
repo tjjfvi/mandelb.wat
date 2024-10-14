@@ -8,6 +8,9 @@ export type WasmImports = {
     u32: (value: number) => void
     f64: (value: number) => void
   }
+  math: {
+    atan2: (x: number, y: number) => number
+  }
 }
 
 export interface WasmExports {

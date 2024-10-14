@@ -3,6 +3,8 @@
   (import "ctx" "id" (global $id i32))
   (import "ctx" "count" (global $count i32))
 
+  (import "math" "atan2" (func $atan2 (param f64) (param f64) (result f64)))
+
   (import "log" "u32" (func $log_u32 (param i32)))
   (import "log" "f64" (func $log_f64 (param f64)))
   (func $dbg_u32 (param $v i32) (result i32) local.get $v call $log_u32 local.get $v)
@@ -11,7 +13,7 @@
   (export "memory" (memory 0))
 
   (global $escape2 (mut f64) (f64.const 16))
-  (global $max_iters (mut i32) (i32.const 1024))
+  (global $max_iters (mut i32) (i32.const 100))
   (export "escape2" (global $escape2))
   (export "max_iters" (global $max_iters))
 
@@ -25,11 +27,16 @@
     (local $min f64)
     (local $max f64)
     (local $v f64)
-    (local $c i32)
+    (local $h f64)
+    (local $s f64)
+
+    (local $r i32)
+    (local $g i32)
+    (local $b i32)
 
     (local $i i32) (local $im i32) (local $j i32)
 
-    (local.set $im (i32.shl (i32.mul (local.get $width) (local.get $height)) (i32.const 3)))
+    (local.set $im (i32.shl (i32.mul (local.get $width) (local.get $height)) (i32.const 4)))
 
     (local.set $min (f64.const inf))
 
@@ -44,25 +51,40 @@
       (br_if $i (i32.lt_u (local.get $im)))
     )
 
+    (call $log_f64 (local.get $min))
+
     (local.set $i (i32.const 0))
     (local.set $j (local.get $im))
     (loop $j
       (local.tee $v (f64.load (local.get $i)))
       (if (f64.eq (f64.const inf)) (then
-        (local.set $c (i32.const 0))
+        (i32.store8 offset=0 (local.get $j) (i32.const 0))
+        (i32.store8 offset=1 (local.get $j) (i32.const 0))
+        (i32.store8 offset=2 (local.get $j) (i32.const 0))
+        (i32.store8 offset=3 (local.get $j) (i32.const 255))
       ) (else
-        (local.set $v (f64.sub (local.get $min) (local.get $v)))
-        (i32.sub (i32.const 255) (i32.trunc_f64_u (f64.mul (call $exp2 (f64.div (local.get $v) (f64.const 16))) (f64.const 255))))
-        (local.set $c)
+        (local.set $h (f64.load offset=8 (local.get $i)))
+        ;; (local.set $v (f64.sub (local.get $v) (local.get $min)))
+        ;; (local.set $v (f64.div (local.get $v) (f64.sub (local.get $max) (local.get $min))))
+        ;; (local.set $s (local.get $v))
+        ;; (local.set $v (f64.sub (local.get $v) (local.get $min)))
+        (local.set $s (f64.sub (f64.const 1) (f64.mul (f64.const 0.6366197723675814) (call $atan2 (f64.div (local.get $v) (f64.const 1)) (f64.const 1)))))
+        ;; (local.set $v (f64.sub (local.get $min) (local.get $v)))
+        ;; (local.set $s (call $exp2 (f64.div (local.get $v) (f64.const 2))))
+        (call $hs (local.get $h) (local.get $s))
+        (local.set $b)
+        (local.set $g)
+        (local.set $r)
+
+        (i32.store8 offset=0 (local.get $j) (local.get $r))
+        (i32.store8 offset=1 (local.get $j) (local.get $g))
+        (i32.store8 offset=2 (local.get $j) (local.get $b))
+        (i32.store8 offset=3 (local.get $j) (i32.const 255))
       ))
 
-      (i32.store8 offset=0 (local.get $j) (local.get $c))
-      (i32.store8 offset=1 (local.get $j) (local.get $c))
-      (i32.store8 offset=2 (local.get $j) (local.get $c))
-      (i32.store8 offset=3 (local.get $j) (i32.const 255))
 
       (local.set $j (i32.add (local.get $j) (i32.const 4)))
-      (local.tee $i (i32.add (local.get $i) (i32.const 8)))
+      (local.tee $i (i32.add (local.get $i) (i32.const 16)))
       (br_if $j (i32.lt_u (local.get $im)))
     )
   )
@@ -96,8 +118,11 @@
     (local $row_len i32)
     (local $grid_len i32)
 
-    (local.set $io (i32.shl (global.get $id) (i32.const 3)))
-    (local.set $chunk_len (i32.shl (global.get $count) (i32.const 3)))
+    (local $a f64)
+    (local $m f64)
+
+    (local.set $io (i32.shl (global.get $id) (i32.const 4)))
+    (local.set $chunk_len (i32.shl (global.get $count) (i32.const 4)))
 
     (local.set $hi (f64.mul (f64.convert_i32_u (local.get $width)) (f64.const 0.5)))
     (local.set $hj (f64.mul (f64.convert_i32_u (local.get $height)) (f64.const 0.5)))
@@ -106,7 +131,7 @@
     (local.set $z (f64.sub (f64.sub (local.get $z) (f64.mul (local.get $hi) (local.get $iz))) (f64.mul (local.get $hj) (local.get $jz))))
     (local.set $w (f64.sub (f64.sub (local.get $w) (f64.mul (local.get $hi) (local.get $iw))) (f64.mul (local.get $hj) (local.get $jw))))
 
-    (local.tee $row_len (i32.shl (local.get $width) (i32.const 3)))
+    (local.tee $row_len (i32.shl (local.get $width) (i32.const 4)))
     (local.set $grid_len (i32.mul (local.get $height)))
 
     (local.set $x (f64.add (local.get $x) (f64.mul (local.get $ix) (f64.convert_i32_u (global.get $id)))))
@@ -127,7 +152,10 @@
       (local.set $i (i32.add (local.get $j) (local.get $io)))
       (local.tee $j (i32.add (local.get $j) (local.get $row_len)))
       (loop $x
-        (f64.store (local.get $i) (call $calc_point (local.get $cx) (local.get $cy) (local.get $cz) (local.get $cw)))
+        (call $calc_point (local.get $cx) (local.get $cy) (local.get $cz) (local.get $cw))
+        (local.set $a) (local.set $m)
+        (f64.store (local.get $i) (local.get $m))
+        (f64.store offset=8 (local.get $i) (local.get $a))
 
         (local.set $cx (f64.add (local.get $cx) (local.get $ix)))
         (local.set $cy (f64.add (local.get $cy) (local.get $iy)))
@@ -144,50 +172,66 @@
     )
   )
 
-  (func $calc_point (param $cx f64) (param $cy f64) (param $zx f64) (param $zy f64) (result f64)
+  (func $calc_point (param $cx f64) (param $cy f64) (param $zx f64) (param $zy f64) (result f64 f64)
     (local $zx2 f64) (local $zy2 f64)
     (local $pzx f64) (local $pzy f64)
-    (local $i i32) (local $o f64)
+    (local $mx f64) (local $my f64)
+    (local $sx f64) (local $sy f64)
+    (local $i i32) (local $o i32)
+    (local $p f64)
 
-    (local.set $o (f64.const 1))
     (local.set $pzx (local.get $zx))
     (local.set $pzy (local.get $zy))
     (local.set $zx2 (f64.mul (local.get $zx) (local.get $zx)))
     (local.set $zy2 (f64.mul (local.get $zy) (local.get $zy)))
+    (local.set $mx (f64.const -1))
 
     (block $skip (loop $cont
+      (f64.add (f64.mul (local.get $mx) (local.get $zx)) (f64.mul (local.get $my) (local.get $zy)))
+      (local.tee $p (f64.mul (f64.const 2) (f64.add (local.get $zx2) (local.get $zy2))))
+      (f64.div)
+      (f64.sub (f64.mul (local.get $my) (local.get $zx)) (f64.mul (local.get $mx) (local.get $zy)))
+      (f64.div (local.get $p))
+      (local.set $my)
+      (local.set $mx)
+      (if (i32.or (f64.ne (local.get $mx) (local.get $mx)) (f64.ne (local.get $my) (local.get $my)))
+        (then)
+        (else
+          (local.set $sx (f64.add (local.get $sx) (local.get $mx)))
+          (local.set $sy (f64.add (local.get $sy) (local.get $my)))
+        )
+      )
       (local.set $zy (f64.add (f64.mul (f64.add (local.get $zx) (local.get $zx)) (local.get $zy)) (local.get $cy)))
       (local.tee $zx (f64.add (f64.sub (local.get $zx2) (local.get $zy2)) (local.get $cx)))
       (local.tee $zx2 (f64.mul (local.get $zx)))
       (local.tee $zy2 (f64.mul (local.get $zy) (local.get $zy)))
-      (if (f64.ge (f64.add) (global.get $escape2))
-        (then
-          (local.set $o (f64.sub
-            (f64.convert_i32_u (i32.add (i32.const 2) (local.get $i)))
-            (call $log2 (call $log2 (f64.add (local.get $zx2) (local.get $zy2))))
-          ))
-        )
+      (if (f64.lt (f64.add) (global.get $escape2))
+        (then)
         (else
-          (if (i32.and (local.get $i) (i32.const 15)) (then
-            (if (f64.le (f64.add
-              (f64.abs (f64.sub (local.get $zx) (local.get $pzx)))
-              (f64.abs (f64.sub (local.get $zy) (local.get $pzy)))
-            ) (global.get $epsilon)) (then
-              (local.set $o (f64.const inf))
-              (br $skip)
-            ))
-          ) (else
-            (local.set $pzx (local.get $zx))
-            (local.set $pzy (local.get $zy))
-          ))
-          (local.tee $i (i32.add (local.get $i) (i32.const 1)))
-          (br_if $cont (i32.lt_u (global.get $max_iters)))
-          (local.set $o (f64.const inf))
+          (local.set $o (i32.const 1))
         )
       )
+      (local.tee $i (i32.add (local.get $i) (i32.const 1)))
+      (br_if $cont (i32.lt_u (global.get $max_iters)))
     ))
 
-    (local.get $o)
+    ;; (if (result f64 f64) (local.get $o)
+    ;;   (then
+        (local.tee $p (f64.add (f64.mul (local.get $sx) (local.get $sx)) (f64.mul (local.get $sy) (local.get $sy))))
+        (if (result f64 f64) (i32.or (f64.ne (local.get $p)) (f64.eq (local.get $p) (f64.const -inf)))
+          (then (f64.const inf) (f64.const 0))
+          (else
+            (f64.sqrt (local.get $p))
+            ;; (f64.const 1)
+            (f64.add (f64.const 3.14159) (call $atan2 (local.get $sx) (local.get $sy)))
+          )
+        )
+      )
+    ;;   (else
+    ;;     (f64.const inf) (f64.const 0)
+    ;;   )
+    ;; )
+
   )
 
   (func $log2 (param $n f64) (result f64) (local $b i64)
@@ -212,7 +256,7 @@
   )
 
   (func $exp2 (param $n f64) (result f64) (local $b i64)
-    (call $i64_max_s (i64.const -1023) (call $i64_min_s (i64.const 1024) (i64.trunc_f64_s (local.get $n))))
+    (i64.trunc_f64_s (f64.max (f64.const -1023) (f64.min (f64.const 1024) (local.get $n))))
     (i64.add (i64.const 1023))
     (i64.shl (i64.const 52))
     (f64.reinterpret_i64)
@@ -237,4 +281,25 @@
     (if (i64.lt_s (local.get $x) (local.get $y)) (then (local.set $x (local.get $y))))
     (local.get $x)
   )
+
+  (func $hs (param $h f64) (param $s f64)
+    (result i32 i32 i32)
+    (local $f f64) (local $p i32) (local $q i32) (local $t i32)
+    (local $i i32)
+
+    (local.set $h (f64.mul (local.get $h) (f64.const 0.954929658551372)))
+    (local.set $f (f64.sub (local.get $h) (f64.floor (local.get $h))))
+    (local.set $p (f64.sub (f64.const 1) (local.get $s)) (i32.trunc_f64_u (f64.mul (f64.const 255))))
+    (local.set $q (f64.sub (f64.const 1) (f64.mul (local.get $s) (local.get $f))) (i32.trunc_f64_u (f64.mul (f64.const 255))))
+    (local.set $t (f64.sub (f64.const 1) (f64.mul (local.get $s) (f64.sub (f64.const 1) (local.get $f)))) (i32.trunc_f64_u (f64.mul (f64.const 255))))
+
+    (local.tee $i (i32.trunc_f64_u (local.get $h)))
+    (if (i32.eqz) (then (return (i32.const 255) (local.get $t) (local.get $p))))
+    (if (i32.eq (local.get $i) (i32.const 1)) (then (return (local.get $q) (i32.const 255) (local.get $p))))
+    (if (i32.eq (local.get $i) (i32.const 2)) (then (return (local.get $p) (i32.const 255) (local.get $t))))
+    (if (i32.eq (local.get $i) (i32.const 3)) (then (return (local.get $p) (local.get $q) (i32.const 255))))
+    (if (i32.eq (local.get $i) (i32.const 4)) (then (return (local.get $t) (local.get $p) (i32.const 255))))
+    (i32.const 255) (local.get $p) (local.get $q)
+  )
+
 )
