@@ -159,9 +159,10 @@ body.addEventListener("mousemove", (e) => {
     const angle = delta[drag.axis] / 100
     transform = Matrix.mul(
       drag.base,
-      drag.target === "ab"
-        ? (drag.axis === 0 ? Matrix.rotateXZ(angle) : Matrix.rotateYW(angle))
-        : (drag.axis === 0 ? Matrix.rotateZY(angle) : Matrix.rotateWX(angle)),
+      // drag.target === "ab"
+      // ? (drag.axis === 0 ? Matrix.rotateXZ(angle) : Matrix.rotateYW(angle))
+      // : (drag.axis === 0 ? Matrix.rotateZY(angle) : Matrix.rotateWX(angle)),
+      drag.axis === 0 ? Matrix.rotateRe(angle) : Matrix.rotateIm(angle),
     )
   }
   render()

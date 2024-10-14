@@ -62,6 +62,30 @@ export namespace Matrix {
     }
   }
 
+  export function rotateRe(angle: number): Matrix {
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    return [
+      [cos, 0, -sin, 0],
+      [0, cos, 0, -sin],
+      [sin, 0, cos, 0],
+      [0, sin, 0, cos],
+      [0, 0, 0, 0],
+    ]
+  }
+
+  export function rotateIm(angle: number): Matrix {
+    const cosh = Math.cosh(angle)
+    const sinh = Math.sinh(angle)
+    return [
+      [cosh, 0, 0, sinh],
+      [0, cosh, -sinh, 0],
+      [0, -sinh, cosh, 0],
+      [sinh, 0, 0, cosh],
+      [0, 0, 0, 0],
+    ]
+  }
+
   export function rotateXZ(angle: number): Matrix {
     const cos = Math.cos(angle)
     const sin = Math.sin(angle)
