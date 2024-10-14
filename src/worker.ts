@@ -18,7 +18,6 @@ async function init() {
       u32: console.log,
       f64: console.log,
     },
-    math: Math,
   }
   const { instance } = await WebAssembly.instantiateStreaming(
     fetch("./mandelb.wasm"),

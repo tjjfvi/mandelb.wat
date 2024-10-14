@@ -48,7 +48,7 @@ class WorkerGroup {
     const img = new ImageData(
       new Uint8ClampedArray(
         this.memory.buffer,
-        imageSize * 4,
+        imageSize * 2,
         imageSize,
       ).slice(),
       width,
